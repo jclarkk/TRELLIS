@@ -21,6 +21,7 @@ def run(args):
     outputs = pipeline.run(
         image,
         seed=555,
+        preprocess_image=False
     )
 
     # GLB files can be extracted from the outputs

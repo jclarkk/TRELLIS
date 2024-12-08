@@ -236,6 +236,10 @@ def postprocess_mesh(
         if verbose:
             tqdm.write(f'After decimate: {vertices.shape[0]} vertices, {faces.shape[0]} faces')
 
+        vertices, faces = smooth_mesh(vertices, faces, iterations=20, relaxation=0.01)
+        if verbose:
+            tqdm.write(f'After smoothing: {vertices.shape[0]} vertices, {faces.shape[0]} faces')
+
     # Remove invisible faces
     if fill_holes:
         vertices, faces = torch.tensor(vertices).cuda(), torch.tensor(faces.astype(np.int32)).cuda()
@@ -273,19 +277,20 @@ def parametrize_mesh(vertices: np.array, faces: np.array):
 
 
 def bake_texture(
-    vertices: np.array,
-    faces: np.array,
-    uvs: np.array,
-    observations: List[np.array],
-    masks: List[np.array],
-    extrinsics: List[np.array],
-    intrinsics: List[np.array],
-    texture_size: int = 2048,
-    near: float = 0.1,
-    far: float = 10.0,
-    mode: Literal['fast', 'opt'] = 'opt',
-    lambda_tv: float = 1e-2,
-    verbose: bool = False,
+        vertices: np.array,
+        faces: np.array,
+        uvs: np.array,
+        observations: List[np.array],
+        masks: List[np.array],
+        extrinsics: List[np.array],
+        intrinsics: List[np.array],
+        texture_size: int = 2048,
+        near: float = 0.1,
+        far: float = 10.0,
+        mode: Literal['fast', 'opt'] = 'opt',
+        lambda_tv: float = 1e-2,
+        gamma: float = 2.0,
+        verbose: bool = False,
 ):
     """
     Bake texture to a mesh from multiple observations.
@@ -303,6 +308,7 @@ def bake_texture(
         far (float): Far plane of the camera.
         mode (Literal['fast', 'opt']): Mode of texture baking.
         lambda_tv (float): Weight of total variation loss in optimization.
+        gamma (float): Gamma correction value. Default is 2.2.
         verbose (bool): Whether to print progress.
     """
     vertices = torch.tensor(vertices).cuda()
@@ -335,9 +341,16 @@ def bake_texture(
 
         mask = texture_weights > 0
         texture[mask] /= texture_weights[mask][:, None]
-        texture = np.clip(texture.reshape(texture_size, texture_size, 3).cpu().numpy() * 255, 0, 255).astype(np.uint8)
+        texture = texture.reshape(texture_size, texture_size, 3).cpu().numpy()
 
-        # inpaint
+        # Apply gamma correction
+        texture = np.clip(texture, 0, 1)
+        texture = np.power(texture, 1 / gamma)
+
+        # Convert to uint8
+        texture = (texture * 255).astype(np.uint8)
+
+        # Inpaint missing regions
         mask = (texture_weights == 0).cpu().numpy().astype(np.uint8).reshape(texture_size, texture_size)
         texture = cv2.inpaint(texture, mask, 3, cv2.INPAINT_TELEA)
 
@@ -384,7 +397,10 @@ def bake_texture(
                 optimizer.param_groups[0]['lr'] = cosine_anealing(optimizer, step, total_steps, 1e-2, 1e-5)
                 pbar.set_postfix({'loss': loss.item()})
                 pbar.update()
-        texture = np.clip(texture[0].flip(0).detach().cpu().numpy() * 255, 0, 255).astype(np.uint8)
+
+        texture = np.clip(texture[0].flip(0).detach().cpu().numpy(), 0, 1)
+        texture = np.power(texture, 1 / gamma)
+        texture = (texture * 255).astype(np.uint8)
         mask = 1 - utils3d.torch.rasterize_triangle_faces(
             rastctx, (uvs * 2 - 1)[None], faces, texture_size, texture_size
         )['mask'][0].detach().cpu().numpy().astype(np.uint8)
@@ -456,3 +472,8 @@ def to_glb(
     vertices = vertices @ np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
     mesh = trimesh.Trimesh(vertices, faces, visual=trimesh.visual.TextureVisuals(uv=uvs, image=texture))
     return mesh
+
+def smooth_mesh(vertices: np.array, faces: np.array, iterations: int = 20, relaxation: float = 0.01):
+    mesh = pv.PolyData(vertices, np.concatenate([np.full((faces.shape[0], 1), 3), faces], axis=1))
+    smoothed_mesh = mesh.smooth(n_iter=iterations, relaxation_factor=relaxation)
+    return smoothed_mesh.points, smoothed_mesh.faces.reshape(-1, 4)[:, 1:]

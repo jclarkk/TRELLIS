@@ -12,6 +12,7 @@ from .base import Pipeline
 from . import samplers
 from ..modules import sparse as sp
 from ..representations import Gaussian, Strivec, MeshExtractResult
+from transformers import AutoModelForImageSegmentation
 
 
 class TrellisImageTo3DPipeline(Pipeline):
@@ -85,23 +86,43 @@ class TrellisImageTo3DPipeline(Pipeline):
         """
         Preprocess the input image.
         """
-        # if has alpha channel, use it directly; otherwise, remove background
+        # Check if the image has an alpha channel and whether to use it directly
         has_alpha = False
         if input.mode == 'RGBA':
             alpha = np.array(input)[:, :, 3]
             if not np.all(alpha == 255):
                 has_alpha = True
+
         if has_alpha:
             output = input
         else:
-            input = input.convert('RGB')
-            max_size = max(input.size)
-            scale = min(1, 1024 / max_size)
-            if scale < 1:
-                input = input.resize((int(input.width * scale), int(input.height * scale)), Image.Resampling.LANCZOS)
-            if getattr(self, 'rembg_session', None) is None:
-                self.rembg_session = rembg.new_session('u2net')
-            output = rembg.remove(input, session=self.rembg_session)
+            model = AutoModelForImageSegmentation.from_pretrained('briaai/RMBG-2.0', trust_remote_code=True)
+            torch.set_float32_matmul_precision(['high', 'highest'][0])
+            model.to('cuda')
+            model.eval()
+
+            # Data settings
+            image_size = (1024, 1024)
+            transform_image = transforms.Compose([
+                transforms.Resize(image_size),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+
+            input_images = transform_image(input).unsqueeze(0).to('cuda')
+
+            # Prediction
+            with torch.no_grad():
+                preds = model(input_images)[-1].sigmoid().cpu()
+            pred = preds[0].squeeze()
+            pred_pil = transforms.ToPILImage()(pred)
+            mask = pred_pil.resize(input.size)
+            input.putalpha(mask)
+
+            torch.cuda.empty_cache()
+            del model
+
+        # Crop and resize based on alpha channel after background removal
         output_np = np.array(output)
         alpha = output_np[:, :, 3]
         bbox = np.argwhere(alpha > 0.8 * 255)
@@ -112,9 +133,12 @@ class TrellisImageTo3DPipeline(Pipeline):
         bbox = center[0] - size // 2, center[1] - size // 2, center[0] + size // 2, center[1] + size // 2
         output = output.crop(bbox)  # type: ignore
         output = output.resize((518, 518), Image.Resampling.LANCZOS)
+
+        # Blend RGB and alpha channels and normalize the result
         output = np.array(output).astype(np.float32) / 255
         output = output[:, :, :3] * output[:, :, 3:4]
         output = Image.fromarray((output * 255).astype(np.uint8))
+
         return output
 
     @torch.no_grad()

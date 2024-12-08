@@ -20,8 +20,8 @@ def run(args):
     # Run the pipeline
     outputs = pipeline.run(
         image,
-        seed=555,
-        preprocess_image=False
+        seed=args.seed,
+        formats=['mesh', 'gaussian']
     )
 
     # GLB files can be extracted from the outputs
@@ -32,7 +32,10 @@ def run(args):
         simplify=0.95,  # Ratio of triangles to remove in the simplification process
         texture_size=1024,  # Size of the texture used for the GLB
     )
-    glb.export(os.path.join(args.output_dir, 'output.glb'))
+
+    # Use image file name as output name
+    output_name = os.path.splitext(os.path.basename(args.image_path))[0]
+    glb.export(os.path.join(args.output_dir, '{}.glb'.format(output_name)))
 
 
 if __name__ == "__main__":

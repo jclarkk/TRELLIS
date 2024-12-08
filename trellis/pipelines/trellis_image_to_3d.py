@@ -93,9 +93,7 @@ class TrellisImageTo3DPipeline(Pipeline):
             if not np.all(alpha == 255):
                 has_alpha = True
 
-        if has_alpha:
-            output = input
-        else:
+        if not has_alpha:
             model = AutoModelForImageSegmentation.from_pretrained('briaai/RMBG-2.0', trust_remote_code=True)
             torch.set_float32_matmul_precision(['high', 'highest'][0])
             model.to('cuda')
@@ -121,6 +119,8 @@ class TrellisImageTo3DPipeline(Pipeline):
 
             torch.cuda.empty_cache()
             del model
+
+        output = input
 
         # Crop and resize based on alpha channel after background removal
         output_np = np.array(output)

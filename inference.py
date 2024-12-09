@@ -1,4 +1,5 @@
 import os
+import torch
 
 os.environ['SPCONV_ALGO'] = 'native'  # Can be 'native' or 'auto', default is 'auto'.
 # 'auto' is faster but will do benchmarking at the beginning.
@@ -23,6 +24,9 @@ def run(args):
         seed=args.seed,
         formats=['mesh', 'gaussian']
     )
+
+    del pipeline
+    torch.cuda.empty_cache()
 
     # GLB files can be extracted from the outputs
     glb = postprocessing_utils.to_glb(

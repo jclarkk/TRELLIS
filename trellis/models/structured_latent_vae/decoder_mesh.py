@@ -8,6 +8,7 @@ from ...modules import sparse as sp
 from .base import SparseTransformerBase
 from ...representations import MeshExtractResult
 from ...representations.mesh import SparseFeatures2Mesh
+from ...representations.mesh import BPTMeshExtractor
 
 
 class SparseSubdivideBlock3d(nn.Module):
@@ -85,6 +86,7 @@ class SLatMeshDecoder(SparseTransformerBase):
         use_checkpoint: bool = False,
         qk_rms_norm: bool = False,
         representation_config: dict = None,
+        mesh_extract_mode: str = "bpt",
     ):
         super().__init__(
             in_channels=latent_channels,
@@ -102,7 +104,14 @@ class SLatMeshDecoder(SparseTransformerBase):
         )
         self.resolution = resolution
         self.rep_config = representation_config
-        self.mesh_extractor = SparseFeatures2Mesh(res=self.resolution*4, use_color=self.rep_config.get('use_color', False))
+
+        if mesh_extract_mode == "flexicubes":
+            self.mesh_extractor = SparseFeatures2Mesh(res=self.resolution*4, use_color=self.rep_config.get('use_color', False))
+        elif mesh_extract_mode == "bpt":
+            self.mesh_extractor = BPTMeshExtractor(res=self.resolution*4, use_color=self.rep_config.get('use_color', False))
+        else:
+            raise ValueError(f"Invalid mesh_extract_mode: {mesh_extract_mode}")
+
         self.out_channels = self.mesh_extractor.feats_channels
         self.upsample = nn.ModuleList([
             SparseSubdivideBlock3d(

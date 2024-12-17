@@ -236,10 +236,6 @@ def postprocess_mesh(
         if verbose:
             tqdm.write(f'After decimate: {vertices.shape[0]} vertices, {faces.shape[0]} faces')
 
-        vertices, faces = smooth_mesh(vertices, faces, iterations=20, relaxation=0.01)
-        if verbose:
-            tqdm.write(f'After smoothing: {vertices.shape[0]} vertices, {faces.shape[0]} faces')
-
     # Remove invisible faces
     if fill_holes:
         vertices, faces = torch.tensor(vertices).cuda(), torch.tensor(faces.astype(np.int32)).cuda()
@@ -255,6 +251,16 @@ def postprocess_mesh(
         vertices, faces = vertices.cpu().numpy(), faces.cpu().numpy()
         if verbose:
             tqdm.write(f'After remove invisible faces: {vertices.shape[0]} vertices, {faces.shape[0]} faces')
+
+    # Simplify again after filling holes
+    if simplify:
+        mesh = pv.PolyData(vertices, np.concatenate([np.full((faces.shape[0], 1), 3), faces], axis=1))
+        mesh = mesh.clean()
+        mesh = mesh.decimate(0.5, volume_preservation=True, progress_bar=verbose)
+        mesh = mesh.smooth(n_iter=50)
+        vertices, faces = mesh.points, mesh.faces.reshape(-1, 4)[:, 1:]
+        if verbose:
+            tqdm.write(f'After decimate: {vertices.shape[0]} vertices, {faces.shape[0]} faces')
 
     return vertices, faces
 
@@ -420,6 +426,7 @@ def to_glb(
     texture_size: int = 1024,
     debug: bool = False,
     verbose: bool = True,
+    gs_renderer='gsplat'
 ) -> trimesh.Trimesh:
     """
     Convert a generated asset to a glb file.
@@ -455,7 +462,8 @@ def to_glb(
     vertices, faces, uvs = parametrize_mesh(vertices, faces)
 
     # bake texture
-    observations, extrinsics, intrinsics = render_multiview(app_rep, resolution=1024, nviews=100)
+    observations, extrinsics, intrinsics = render_multiview(app_rep, resolution=1024, nviews=100,
+                                                            gs_renderer=gs_renderer)
     masks = [np.any(observation > 0, axis=-1) for observation in observations]
     extrinsics = [extrinsics[i].cpu().numpy() for i in range(len(extrinsics))]
     intrinsics = [intrinsics[i].cpu().numpy() for i in range(len(intrinsics))]
@@ -472,8 +480,3 @@ def to_glb(
     vertices = vertices @ np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
     mesh = trimesh.Trimesh(vertices, faces, visual=trimesh.visual.TextureVisuals(uv=uvs, image=texture))
     return mesh
-
-def smooth_mesh(vertices: np.array, faces: np.array, iterations: int = 20, relaxation: float = 0.01):
-    mesh = pv.PolyData(vertices, np.concatenate([np.full((faces.shape[0], 1), 3), faces], axis=1))
-    smoothed_mesh = mesh.smooth(n_iter=iterations, relaxation_factor=relaxation)
-    return smoothed_mesh.points, smoothed_mesh.faces.reshape(-1, 4)[:, 1:]

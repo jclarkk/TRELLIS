@@ -101,13 +101,17 @@ class TrellisImageTo3DPipeline(Pipeline):
 
             # Data settings
             image_size = (1024, 1024)
+            # Convert to RGB before applying transforms
             transform_image = transforms.Compose([
+                transforms.Lambda(lambda img: img.convert('RGB')),
                 transforms.Resize(image_size),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
 
-            input_images = transform_image(input).unsqueeze(0).to('cuda')
+            # Ensure image is in RGB mode for prediction
+            input_rgb = input.convert('RGB')
+            input_images = transform_image(input_rgb).unsqueeze(0).to('cuda')
 
             # Prediction
             with torch.no_grad():

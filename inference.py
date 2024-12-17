@@ -29,8 +29,9 @@ def run(args):
         outputs['gaussian'][0],
         outputs['mesh'][0],
         # Optional parameters
-        simplify=0.95,  # Ratio of triangles to remove in the simplification process
-        texture_size=1024,  # Size of the texture used for the GLB
+        simplify=0.90,  # Ratio of triangles to remove in the simplification process
+        texture_size=2048,  # Size of the texture used for the GLB
+        gs_renderer='gsplat',  # Renderer to use for the Gaussian representation
     )
 
     # Use image file name as output name

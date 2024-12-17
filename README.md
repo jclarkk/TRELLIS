@@ -13,7 +13,7 @@
 <!-- Features -->
 ## 🌟 Features
 - **High Quality**: It produces diverse 3D assets at high quality with intricate shape and texture details.
-- **Versatility**: It takes text or image prompts and can generate various final 3D representations including but not limited to Radiance Fields, 3D Gaussians, and meshes, accommodating diverse downstream requirements.
+- **Versatility**: It takes text or image prompts and can generate various final 3D representations including but not limited to *Radiance Fields*, *3D Gaussians*, and *meshes*, accommodating diverse downstream requirements.
 - **Flexible Editing**: It allows for easy editings of generated 3D assets, such as generating variants of the same object or local editing of the 3D asset.
 
 <!-- TODO List -->
@@ -26,11 +26,12 @@
 ## 📦 Installation
 
 ### Prerequisites
-- Linux is recommended for running the code. The code is not tested on other platforms.
-- [Conda](https://docs.anaconda.com/miniconda/install/#quick-command-line-install) is recommended for managing the dependencies.
-- Python 3.8 or higher is required.
-- NVIDIA GPU with more than 16GB memory is required. The code has been tested on NVIDIA A100 and A6000 GPUs.
-- [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive) is required to compile some of the submodules. We tested the code on CUDA 11.8 and 12.2.
+- **System**: The code is currently tested only on **Linux**.  For windows setup, you may refer to [#3](https://github.com/microsoft/TRELLIS/issues/3) (not fully tested).
+- **Hardware**: An NVIDIA GPU with at least 16GB of memory is necessary. The code has been verified on NVIDIA A100 and A6000 GPUs.  
+- **Software**:   
+  - The [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive) is needed to compile certain submodules. The code has been tested with CUDA versions 11.8 and 12.2.  
+  - [Conda](https://docs.anaconda.com/miniconda/install/#quick-command-line-install) is recommended for managing dependencies.  
+  - Python version 3.8 or higher is required. 
 
 ### Installation Steps
 1. Clone the repo:
@@ -184,9 +185,13 @@ Then, you can access the demo at the address shown in the terminal.
 <!-- License -->
 ## ⚖️ License
 
-TRELLIS models and the majority of the code are licensed under the [MIT License](LICENSE). Some submodules may have different licenses:
-- [**diffoctreerast**](https://github.com/JeffreyXiang/diffoctreerast): The CUDA-based real-time differentiable octree renderer we developed to render radiance fields in this project. It is a derivative of the [diff-gaussian-rasterization](https://github.com/graphdeco-inria/diff-gaussian-rasterization) and is licensed under [LICENSE](https://github.com/JeffreyXiang/diffoctreerast/blob/master/LICENSE).
-- [**Modified Flexicubes**](https://github.com/MaxtirError/FlexiCubes): The modified version of [Flexicubes](https://github.com/nv-tlabs/FlexiCubes) used in this project to support vertex attributes. It is licensed under [LICENSE](https://github.com/nv-tlabs/FlexiCubes/blob/main/LICENSE.txt)
+TRELLIS models and the majority of the code are licensed under the [MIT License](LICENSE). The following submodules may have different licenses:
+- [**diffoctreerast**](https://github.com/JeffreyXiang/diffoctreerast): We developed a CUDA-based real-time differentiable octree renderer for rendering radiance fields as part of this project. This renderer is derived from the [diff-gaussian-rasterization](https://github.com/graphdeco-inria/diff-gaussian-rasterization) project and is available under the [LICENSE](https://github.com/JeffreyXiang/diffoctreerast/blob/master/LICENSE).
+
+
+- [**Modified Flexicubes**](https://github.com/MaxtirError/FlexiCubes): In this project, we used a modified version of [Flexicubes](https://github.com/nv-tlabs/FlexiCubes) to support vertex attributes. This modified version is licensed under the [LICENSE](https://github.com/nv-tlabs/FlexiCubes/blob/main/LICENSE.txt).
+
+
 
 
 <!-- Citation -->

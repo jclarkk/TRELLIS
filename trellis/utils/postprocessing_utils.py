@@ -256,6 +256,7 @@ def postprocess_mesh(
     if simplify:
         mesh = pv.PolyData(vertices, np.concatenate([np.full((faces.shape[0], 1), 3), faces], axis=1))
         mesh = mesh.clean()
+        mesh = mesh.triangulate()
         mesh = mesh.decimate(0.5, volume_preservation=True, progress_bar=verbose)
         mesh = mesh.smooth(n_iter=50)
         vertices, faces = mesh.points, mesh.faces.reshape(-1, 4)[:, 1:]

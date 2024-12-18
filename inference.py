@@ -4,6 +4,7 @@ os.environ['SPCONV_ALGO'] = 'native'  # Can be 'native' or 'auto', default is 'a
 # 'auto' is faster but will do benchmarking at the beginning.
 # Recommended to set to 'native' if run only once.
 import argparse
+import torch
 from PIL import Image
 from trellis.pipelines import TrellisImageTo3DPipeline
 from trellis.utils import postprocessing_utils
@@ -23,6 +24,9 @@ def run(args):
         seed=args.seed,
         formats=['mesh', 'gaussian']
     )
+
+    del pipeline
+    torch.cuda.empty_cache()
 
     # GLB files can be extracted from the outputs
     glb = postprocessing_utils.to_glb(

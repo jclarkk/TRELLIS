@@ -19,8 +19,8 @@ image = Image.open("assets/example_image/T.png")
 # Run the pipeline
 outputs = pipeline.run(
     image,
-    # Optional parameters
     seed=1,
+    # Optional parameters
     # sparse_structure_sampler_params={
     #     "steps": 12,
     #     "cfg_strength": 7.5,
@@ -52,3 +52,6 @@ glb = postprocessing_utils.to_glb(
     texture_size=1024,      # Size of the texture used for the GLB
 )
 glb.export("sample.glb")
+
+# Save Gaussians as PLY files
+outputs['gaussian'][0].save_ply("sample.ply")

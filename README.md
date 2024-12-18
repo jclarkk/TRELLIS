@@ -16,6 +16,12 @@
 - **Versatility**: It takes text or image prompts and can generate various final 3D representations including but not limited to *Radiance Fields*, *3D Gaussians*, and *meshes*, accommodating diverse downstream requirements.
 - **Flexible Editing**: It allows for easy editings of generated 3D assets, such as generating variants of the same object or local editing of the 3D asset.
 
+<!-- Updates -->
+## ⏩ Updates
+**12/18/2024**
+- Implementation of multi-image conditioning for TRELLIS-image model. ([#7](https://github.com/microsoft/TRELLIS/issues/7)). This is based on tuning-free algorithm without training a specialized model, so it may not give the best results for all input images.
+- Add Gaussian export in `app.py` and `example.py`. ([#40](https://github.com/microsoft/TRELLIS/issues/40))
+
 <!-- TODO List -->
 ## 🚧 TODO List
 - [x] Release inference code and TRELLIS-image-large model
@@ -123,8 +129,8 @@ image = Image.open("assets/example_image/T.png")
 # Run the pipeline
 outputs = pipeline.run(
     image,
-    # Optional parameters
     seed=1,
+    # Optional parameters
     # sparse_structure_sampler_params={
     #     "steps": 12,
     #     "cfg_strength": 7.5,
@@ -156,6 +162,9 @@ glb = postprocessing_utils.to_glb(
     texture_size=1024,      # Size of the texture used for the GLB
 )
 glb.export("sample.glb")
+
+# Save Gaussians as PLY files
+outputs['gaussian'][0].save_ply("sample.ply")
 ```
 
 After running the code, you will get the following files:
@@ -163,6 +172,7 @@ After running the code, you will get the following files:
 - `sample_rf.mp4`: a video showing the Radiance Field representation
 - `sample_mesh.mp4`: a video showing the mesh representation
 - `sample.glb`: a GLB file containing the extracted textured mesh
+- `sample.ply`: a PLY file containing the 3D Gaussian representation
 
 
 ### Web Demo

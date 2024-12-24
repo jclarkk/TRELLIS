@@ -8,6 +8,7 @@ import trimesh
 import trimesh.visual
 import xatlas
 import pyvista as pv
+import pymeshfix
 from pymeshfix import _meshfix
 import igraph
 import cv2
@@ -258,11 +259,10 @@ def postprocess_mesh(
         mesh = pv.PolyData(vertices, np.concatenate([np.full((faces.shape[0], 1), 3), faces], axis=1))
         mesh = mesh.clean()
         mesh = mesh.triangulate()
-        mesh = mesh.decimate(0.5, volume_preservation=True, progress_bar=verbose)
         mesh = mesh.smooth(n_iter=50)
         vertices, faces = mesh.points, mesh.faces.reshape(-1, 4)[:, 1:]
         if verbose:
-            tqdm.write(f'After decimate: {vertices.shape[0]} vertices, {faces.shape[0]} faces')
+            tqdm.write(f'After final simplify: {vertices.shape[0]} vertices, {faces.shape[0]} faces')
 
     return vertices, faces
 
@@ -297,7 +297,6 @@ def bake_texture(
         far: float = 10.0,
         mode: Literal['fast', 'opt'] = 'opt',
         lambda_tv: float = 1e-2,
-        gamma: float = 2.0,
         verbose: bool = False,
 ):
     """
@@ -316,7 +315,6 @@ def bake_texture(
         far (float): Far plane of the camera.
         mode (Literal['fast', 'opt']): Mode of texture baking.
         lambda_tv (float): Weight of total variation loss in optimization.
-        gamma (float): Gamma correction value. Default is 2.2.
         verbose (bool): Whether to print progress.
     """
     vertices = torch.tensor(vertices).cuda()
@@ -338,7 +336,7 @@ def bake_texture(
                 )
                 uv_map = rast['uv'][0].detach().flip(0)
                 mask = rast['mask'][0].detach().bool() & masks[0]
-            
+
             # nearest neighbor interpolation
             uv_map = (uv_map * texture_size).floor().long()
             obs = observation[mask]
@@ -350,10 +348,6 @@ def bake_texture(
         mask = texture_weights > 0
         texture[mask] /= texture_weights[mask][:, None]
         texture = texture.reshape(texture_size, texture_size, 3).cpu().numpy()
-
-        # Apply gamma correction
-        texture = np.clip(texture, 0, 1)
-        texture = np.power(texture, 1 / gamma)
 
         # Convert to uint8
         texture = (texture * 255).astype(np.uint8)
@@ -384,11 +378,11 @@ def bake_texture(
 
         def cosine_anealing(optimizer, step, total_steps, start_lr, end_lr):
             return end_lr + 0.5 * (start_lr - end_lr) * (1 + np.cos(np.pi * step / total_steps))
-        
+
         def tv_loss(texture):
             return torch.nn.functional.l1_loss(texture[:, :-1, :, :], texture[:, 1:, :, :]) + \
                    torch.nn.functional.l1_loss(texture[:, :, :-1, :], texture[:, :, 1:, :])
-    
+
         total_steps = 2500
         with tqdm(total=total_steps, disable=not verbose, desc='Texture baking (opt): optimizing') as pbar:
             for step in range(total_steps):
@@ -407,7 +401,6 @@ def bake_texture(
                 pbar.update()
 
         texture = np.clip(texture[0].flip(0).detach().cpu().numpy(), 0, 1)
-        texture = np.power(texture, 1 / gamma)
         texture = (texture * 255).astype(np.uint8)
         mask = 1 - utils3d.torch.rasterize_triangle_faces(
             rastctx, (uvs * 2 - 1)[None], faces, texture_size, texture_size
@@ -445,7 +438,7 @@ def to_glb(
     """
     vertices = mesh.vertices.cpu().numpy()
     faces = mesh.faces.cpu().numpy()
-    
+
     # mesh postprocess
     vertices, faces = postprocess_mesh(
         vertices, faces,
@@ -504,11 +497,11 @@ def simplify_gs(
     """
     if simplify <= 0:
         return gs
-    
+
     # simplify
     observations, extrinsics, intrinsics = render_multiview(gs, resolution=1024, nviews=100)
     observations = [torch.tensor(obs / 255.0).float().cuda().permute(2, 0, 1) for obs in observations]
-    
+
     # Following https://arxiv.org/pdf/2411.06019
     renderer = GaussianRenderer({
             "resolution": 1024,
@@ -524,7 +517,7 @@ def simplify_gs(
     new_gs._rotation = torch.nn.Parameter(gs._rotation.clone())
     new_gs._scaling = torch.nn.Parameter(gs._scaling.clone())
     new_gs._xyz = torch.nn.Parameter(gs._xyz.clone())
-    
+
     start_lr = [1e-4, 1e-3, 5e-3, 0.025]
     end_lr = [1e-6, 1e-5, 5e-5, 0.00025]
     optimizer = torch.optim.Adam([
@@ -533,19 +526,19 @@ def simplify_gs(
         {"params": new_gs._scaling, "lr": start_lr[2]},
         {"params": new_gs._opacity, "lr": start_lr[3]},
     ], lr=start_lr[0])
-    
+
     def exp_anealing(optimizer, step, total_steps, start_lr, end_lr):
             return start_lr * (end_lr / start_lr) ** (step / total_steps)
 
     def cosine_anealing(optimizer, step, total_steps, start_lr, end_lr):
         return end_lr + 0.5 * (start_lr - end_lr) * (1 + np.cos(np.pi * step / total_steps))
-    
+
     _zeta = new_gs.get_opacity.clone().detach().squeeze()
     _lambda = torch.zeros_like(_zeta)
     _delta = 1e-7
     _interval = 10
     num_target = int((1 - simplify) * _zeta.shape[0])
-    
+
     with tqdm(total=2500, disable=not verbose, desc='Simplifying Gaussian') as pbar:
         for i in range(2500):
             # prune
@@ -571,7 +564,7 @@ def simplify_gs(
                     optimizer.state[param_group['params'][0]] = stored_state
 
             opacity = new_gs.get_opacity.squeeze()
-            
+
             # sparisfy
             if i % _interval == 0:
                 _zeta = _lambda + opacity.detach()
@@ -581,32 +574,32 @@ def simplify_gs(
                     _m[index] = 0
                     _zeta[_m] = 0
                 _lambda = _lambda + opacity.detach() - _zeta
-            
+
             # sample a random view
             view_idx = np.random.randint(len(observations))
             observation = observations[view_idx]
             extrinsic = extrinsics[view_idx]
             intrinsic = intrinsics[view_idx]
-            
+
             color = renderer.render(new_gs, extrinsic, intrinsic)['color']
             rgb_loss = torch.nn.functional.l1_loss(color, observation)
             loss = rgb_loss + \
                    _delta * torch.sum(torch.pow(_lambda + opacity - _zeta, 2))
-            
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
+
             # update lr
             for j in range(len(optimizer.param_groups)):
                 optimizer.param_groups[j]['lr'] = cosine_anealing(optimizer, i, 2500, start_lr[j], end_lr[j])
-            
+
             pbar.set_postfix({'loss': rgb_loss.item(), 'num': opacity.shape[0], 'lambda': _lambda.mean().item()})
             pbar.update()
-            
+
     new_gs._xyz = new_gs._xyz.data
     new_gs._rotation = new_gs._rotation.data
     new_gs._scaling = new_gs._scaling.data
     new_gs._opacity = new_gs._opacity.data
-    
+
     return new_gs

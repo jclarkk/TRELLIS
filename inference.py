@@ -5,6 +5,7 @@ os.environ['SPCONV_ALGO'] = 'native'  # Can be 'native' or 'auto', default is 'a
 # Recommended to set to 'native' if run only once.
 import argparse
 import torch
+import uuid
 from PIL import Image
 from trellis.pipelines import TrellisImageTo3DPipeline
 from trellis.utils import postprocessing_utils
@@ -15,15 +16,27 @@ def run(args):
     pipeline = TrellisImageTo3DPipeline.from_pretrained("JeffreyXiang/TRELLIS-image-large")
     pipeline.cuda()
 
-    # Load an image
-    image = Image.open(args.image_path)
+    # Load images
+    images = []
+    for image_path in args.image_paths:
+        image = Image.open(image_path)
+        images.append(image)
 
     # Run the pipeline
-    outputs = pipeline.run(
-        image,
-        seed=args.seed,
-        formats=['mesh', 'gaussian']
-    )
+    if len(images) > 1:
+        outputs = pipeline.run_multi_image(
+            images,
+            seed=args.seed,
+            formats=['mesh', 'gaussian']
+        )
+    elif len(images) == 1:
+        outputs = pipeline.run(
+            images[0],
+            seed=args.seed,
+            formats=['mesh', 'gaussian']
+        )
+    else:
+        raise ValueError('No images provided')
 
     del pipeline
     torch.cuda.empty_cache()
@@ -39,14 +52,18 @@ def run(args):
     )
 
     # Use image file name as output name
-    output_name = os.path.splitext(os.path.basename(args.image_path))[0]
+    if len(args.image_paths) == 1:
+        output_name = os.path.splitext(os.path.basename(args.image_paths[0]))[0]
+    else:
+        output_name = str(uuid.uuid4()).replace('-', '')
     glb.export(os.path.join(args.output_dir, '{}.glb'.format(output_name)))
 
 
 if __name__ == "__main__":
     # Parse arguments and then call run
     parser = argparse.ArgumentParser()
-    parser.add_argument('--image_path', type=str, required=True)
+    parser.add_argument('--image_paths', type=str, nargs='+', required=True,
+                        help='Path to input images. Can specify multiple paths separated by spaces')
     parser.add_argument('--output_dir', type=str, required=True)
     parser.add_argument('--seed', type=int, default=0)
     args = parser.parse_args()

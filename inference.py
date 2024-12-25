@@ -27,13 +27,29 @@ def run(args):
         outputs = pipeline.run_multi_image(
             images,
             seed=args.seed,
-            formats=['mesh', 'gaussian']
+            formats=['mesh', 'gaussian'],
+            sparse_structure_sampler_params={
+                "steps": args.sparse_steps,
+                "cfg_strength": args.sparse_cfg_strength,
+            },
+            slat_sampler_params={
+                "steps": args.slat_steps,
+                "cfg_strength": args.slat_cfg_strength,
+            },
         )
     elif len(images) == 1:
         outputs = pipeline.run(
             images[0],
             seed=args.seed,
-            formats=['mesh', 'gaussian']
+            formats=['mesh', 'gaussian'],
+            sparse_structure_sampler_params={
+                "steps": args.sparse_steps,
+                "cfg_strength": args.sparse_cfg_strength,
+            },
+            slat_sampler_params={
+                "steps": args.slat_steps,
+                "cfg_strength": args.slat_cfg_strength,
+            },
         )
     else:
         raise ValueError('No images provided')
@@ -45,10 +61,9 @@ def run(args):
     glb = postprocessing_utils.to_glb(
         outputs['gaussian'][0],
         outputs['mesh'][0],
-        # Optional parameters
-        simplify=0.90,  # Ratio of triangles to remove in the simplification process
-        texture_size=2048,  # Size of the texture used for the GLB
-        gs_renderer='gsplat',  # Renderer to use for the Gaussian representation
+        simplify=args.simplify_ratio,
+        texture_size=args.texture_size,
+        gs_renderer=args.gs_renderer,
     )
 
     # Use image file name as output name
@@ -65,7 +80,14 @@ if __name__ == "__main__":
     parser.add_argument('--image_paths', type=str, nargs='+', required=True,
                         help='Path to input images. Can specify multiple paths separated by spaces')
     parser.add_argument('--output_dir', type=str, required=True)
-    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--seed', type=int, default=0, help='Seed for the random number generator')
+    parser.add_argument('--texture_size', type=int, default=2048, help='Resolution size of the texture used for the GLB')
+    parser.add_argument('--simplify_ratio', type=float, default=0.90, help='Simplification ratio for the mesh')
+    parser.add_argument('--gs_renderer', type=str, default='gsplat', help='Renderer to use for the Gaussian representation')
+    parser.add_argument('--sparse_steps', type=int, default=64, help='Number of steps for the sparse structure sampler')
+    parser.add_argument('--sparse_cfg_strength', type=float, default=7.5, help='Strength of the sparse structure sampler')
+    parser.add_argument('--slat_steps', type=int, default=64, help='Number of steps for the SLAT sampler')
+    parser.add_argument('--slat_cfg_strength', type=float, default=3, help='Strength of the SLAT sampler')
     args = parser.parse_args()
 
     run(args)

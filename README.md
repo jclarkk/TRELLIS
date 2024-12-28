@@ -18,6 +18,10 @@
 
 <!-- Updates -->
 ## ⏩ Updates
+
+**12/26/2024**
+- Release [**TRELLIS-500K**](https://github.com/microsoft/TRELLIS#-dataset) dataset and toolkits for data preparation.
+
 **12/18/2024**
 - Implementation of multi-image conditioning for TRELLIS-image model. ([#7](https://github.com/microsoft/TRELLIS/issues/7)). This is based on tuning-free algorithm without training a specialized model, so it may not give the best results for all input images.
 - Add Gaussian export in `app.py` and `example.py`. ([#40](https://github.com/microsoft/TRELLIS/issues/40))
@@ -25,8 +29,9 @@
 <!-- TODO List -->
 ## 🚧 TODO List
 - [x] Release inference code and TRELLIS-image-large model
+- [x] Release dataset and dataset toolkits
 - [ ] Release TRELLIS-text model series
-- [ ] Release training code and data
+- [ ] Release training code
 
 <!-- Installation -->
 ## 📦 Installation
@@ -191,6 +196,11 @@ Then, you can access the demo at the address shown in the terminal.
 
 ***The web demo is also available on [Hugging Face Spaces](https://huggingface.co/spaces/JeffreyXiang/TRELLIS)!***
 
+
+<!-- Dataset -->
+## 📚 Dataset
+
+We provide **TRELLIS-500K**, a large-scale dataset containing 500K 3D assets curated from [Objaverse(XL)](https://objaverse.allenai.org/), [ABO](https://amazon-berkeley-objects.s3.amazonaws.com/index.html), [3D-FUTURE](https://tianchi.aliyun.com/specials/promotion/alibaba-3d-future), [HSSD](https://huggingface.co/datasets/hssd/hssd-models), and [Toys4k](https://github.com/rehg-lab/lowshot-shapebias/tree/main/toys4k), filtered based on aesthetic scores. Please refer to the [dataset README](DATASET.md) for more details.
 
 <!-- License -->
 ## ⚖️ License

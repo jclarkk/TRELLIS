@@ -14,6 +14,8 @@ from . import samplers
 from ..modules import sparse as sp
 from ..representations import Gaussian, Strivec, MeshExtractResult
 from transformers import AutoModelForImageSegmentation
+from trellis.modules.attention_utils import enable_sage_attention
+from trellis.modules import set_attention_backend
 
 
 class TrellisImageTo3DPipeline(Pipeline):
@@ -68,6 +70,9 @@ class TrellisImageTo3DPipeline(Pipeline):
         new_pipeline.slat_normalization = args['slat_normalization']
 
         new_pipeline._init_image_cond_model(args['image_cond_model'])
+
+        set_attention_backend("sage")
+        enable_sage_attention()
 
         return new_pipeline
     

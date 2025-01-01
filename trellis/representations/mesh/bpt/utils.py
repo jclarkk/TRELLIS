@@ -66,10 +66,8 @@ def apply_normalize(mesh):
 
 
 
-def sample_pc(mesh_path, pc_num, with_normal=False):
-
-    mesh = trimesh.load(mesh_path, force='mesh', process=False)
-    mesh = apply_normalize(mesh)
+def sample_pc(trimesh, pc_num, with_normal=False):
+    mesh = apply_normalize(trimesh)
     
     if not with_normal:
         points, _ = mesh.sample(pc_num, return_index=True)

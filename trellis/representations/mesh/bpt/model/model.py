@@ -46,10 +46,10 @@ class MeshTransformer(Module):
     def __init__(
         self,
         *,
-        dim: Union[int, Tuple[int, int]] = 512,  # hidden size of Transformer
-        max_seq_len = 9600,                      # max sequence length
+        dim: Union[int, Tuple[int, int]] = 1024,  # hidden size of Transformer
+        max_seq_len = 10000,                      # max sequence length
         flash_attn = True,                       # wether to use flash attention
-        attn_depth = 12,                         # number of layers
+        attn_depth = 24,                         # number of layers
         attn_dim_head = 64,                      # dim for each head
         attn_heads = 16,                         # number of heads
         attn_kwargs: dict = dict(
@@ -57,18 +57,18 @@ class MeshTransformer(Module):
             num_mem_kv = 4,
             attn_qk_norm = True,
         ),
-        dropout = 0.,
+        dropout = 0.0,
         pad_id = -1,
         coor_continuous_range = (-1., 1.),
-        num_discrete_coors = 128,
+        num_discrete_coors = 2**int(7),
         block_size = 8,
         offset_size = 16,
         mode = 'vertices',
         special_token = -2,
-        use_special_block = False,
-        conditioned_on_pc = False,
+        use_special_block = True,
+        conditioned_on_pc = True,
         encoder_name = 'miche-256-feature',
-        encoder_freeze = True,
+        encoder_freeze = False,
     ):
         super().__init__()
 
@@ -147,10 +147,10 @@ class MeshTransformer(Module):
         prompt: Optional[Tensor] = None,
         pc: Optional[Tensor] = None,
         cond_embeds: Optional[Tensor] = None,
-        batch_size: Optional[int] = None,
+        batch_size: Optional[int] = 1,
         filter_logits_fn: Callable = top_k,
         filter_kwargs: dict = dict(),
-        temperature = 1.,
+        temperature = 0.5,
         return_codes = False,
         cache_kv = True,
         max_seq_len = None,

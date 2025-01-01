@@ -15,6 +15,10 @@ from PIL import Image
 from .random_utils import sphere_hammersley_sequence
 from .render_utils import render_multiview
 from ..representations import Strivec, Gaussian, MeshExtractResult
+from ..representations.mesh.bpt.utils import sample_pc, joint_filter
+from ..representations.mesh.bpt.model.model import MeshTransformer
+from ..representations.mesh.bpt.model.serializaiton import BPT_deserialize
+from ..representations.mesh.bpt.model import data_utils
 
 
 @torch.no_grad()
@@ -208,6 +212,8 @@ def postprocess_mesh(
     fill_holes_num_views: int = 1000,
     debug: bool = False,
     verbose: bool = False,
+    retopologize: bool = True,
+    bpt_model_path: str = './weights/bpt-8-16-500m.pt',
 ):
     """
     Postprocess a mesh by simplifying, removing invisible faces, and removing isolated pieces.
@@ -239,6 +245,55 @@ def postprocess_mesh(
         vertices, faces = smooth_mesh(vertices, faces, iterations=20, relaxation=0.01)
         if verbose:
             tqdm.write(f'After smoothing: {vertices.shape[0]} vertices, {faces.shape[0]} faces')
+
+    # Retopologize
+    if retopologize:
+        mesh = trimesh.Trimesh(vertices, faces)
+        pc_normal = sample_pc(mesh, pc_num=8192, with_normal=True)
+
+        pc_normal = pc_normal[None, :, :] if len(pc_normal.shape) == 2 else pc_normal
+
+        model = MeshTransformer()
+        model.load(bpt_model_path)
+        model = model.eval()
+        model = model.half()
+        model = model.cuda()
+
+        pc_tensor = torch.from_numpy(pc_normal).cuda().half()
+        if len(pc_tensor.shape) == 2:
+            pc_tensor = pc_tensor.unsqueeze(0)
+
+        codes = model.generate(
+            pc=pc_tensor,
+            filter_logits_fn=joint_filter,
+            filter_kwargs=dict(k=50, p=0.95),
+            return_codes=True,
+        )
+
+        coords = []
+        try:
+            for i in range(len(codes)):
+                code = codes[i]
+                code = code[code != model.pad_id].cpu().numpy()
+                vertices = BPT_deserialize(
+                    code,
+                    block_size=model.block_size,
+                    offset_size=model.offset_size,
+                    use_special_block=model.use_special_block,
+                )
+                coords.append(vertices)
+        except:
+            coords.append(np.zeros(3, 3))
+
+        # convert coordinates to mesh
+        vertices = coords[0]
+        faces = torch.arange(1, len(vertices) + 1).view(-1, 3)
+        mesh = data_utils.to_mesh(vertices, faces, transpose=False, post_process=True)
+
+        if verbose:
+            tqdm.write(f'After retopology: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces')
+
+        return mesh.vertices.astype(np.float32), mesh.faces
 
     # Remove invisible faces
     if fill_holes:

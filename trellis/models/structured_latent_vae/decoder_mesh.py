@@ -1,14 +1,10 @@
 from typing import *
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
 from ...modules.utils import zero_module, convert_module_to_f16, convert_module_to_f32
 from ...modules import sparse as sp
 from .base import SparseTransformerBase
 from ...representations import MeshExtractResult
 from ...representations.mesh import SparseFeatures2Mesh
-from ...representations.mesh import BPTMeshExtractor
 
 
 class SparseSubdivideBlock3d(nn.Module):
@@ -105,12 +101,7 @@ class SLatMeshDecoder(SparseTransformerBase):
         self.resolution = resolution
         self.rep_config = representation_config
 
-        if mesh_extract_mode == "flexicubes":
-            self.mesh_extractor = SparseFeatures2Mesh(res=self.resolution*4, use_color=self.rep_config.get('use_color', False))
-        elif mesh_extract_mode == "bpt":
-            self.mesh_extractor = BPTMeshExtractor(res=self.resolution*4, use_color=self.rep_config.get('use_color', False))
-        else:
-            raise ValueError(f"Invalid mesh_extract_mode: {mesh_extract_mode}")
+        self.mesh_extractor = SparseFeatures2Mesh(res=self.resolution*4, use_color=self.rep_config.get('use_color', False))
 
         self.out_channels = self.mesh_extractor.feats_channels
         self.upsample = nn.ModuleList([

@@ -19,6 +19,28 @@ from ..renderers import GaussianRenderer
 from ..representations import Strivec, Gaussian, MeshExtractResult
 
 
+def _rgb_to_srgb(f: torch.Tensor) -> torch.Tensor:
+    """
+    convert a tensor, in any form / dimension, from rgb space to srgb space
+    Args:
+        f (torch.Tensor): input tensor
+
+    """
+    return torch.where(f <= 0.0031308, f * 12.92, torch.pow(torch.clamp(f, 0.0031308), 1.0 / 2.4) * 1.055 - 0.055)
+
+
+def rgb_to_srgb_image(f: torch.Tensor) -> torch.Tensor:
+    """
+    convert an image tensor from rgb space to srgb space
+    Args:
+        f (torch.Tensor): input tensor
+
+    """
+    assert f.shape[-1] == 3 or f.shape[-1] == 4
+    out = torch.cat((_rgb_to_srgb(f[..., 0:3]), f[..., 3:4]), dim=-1) if f.shape[-1] == 4 else _rgb_to_srgb(f)
+    assert out.shape[0] == f.shape[0] and out.shape[1] == f.shape[1] and out.shape[2] == f.shape[2]
+    return out
+
 @torch.no_grad()
 def _fill_holes(
     verts,
@@ -175,8 +197,8 @@ def _fill_holes(
         vis_verts = verts.cpu().numpy()
         vis_edges = edges[torch.cat(cutting_edges)].cpu().numpy()
         utils3d.io.write_ply('dbg_cut.ply', vis_verts, edges=vis_edges)
-        
-    
+
+
     if len(valid_remove_cc) > 0:
         remove_face_indices = remove_face_indices[torch.cat(valid_remove_cc)]
         mask = torch.ones(faces.shape[0], dtype=torch.bool, device=faces.device)
@@ -400,6 +422,7 @@ def bake_texture(
                 pbar.set_postfix({'loss': loss.item()})
                 pbar.update()
 
+        texture = rgb_to_srgb_image(texture)
         texture = np.clip(texture[0].flip(0).detach().cpu().numpy(), 0, 1)
         texture = (texture * 255).astype(np.uint8)
         mask = 1 - utils3d.torch.rasterize_triangle_faces(

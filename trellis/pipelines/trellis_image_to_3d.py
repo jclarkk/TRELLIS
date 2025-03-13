@@ -1,3 +1,5 @@
+import os
+
 from typing import *
 from contextlib import contextmanager
 import torch
@@ -75,7 +77,11 @@ class TrellisImageTo3DPipeline(Pipeline):
         """
         Initialize the image conditioning model.
         """
-        dinov2_model = torch.hub.load('facebookresearch/dinov2', name, pretrained=True)
+        if os.getenv('DINOV2_PATH', None) is not None:
+            dinov2_path = os.getenv('DINOV2_PATH')
+            dinov2_model = torch.hub.load(dinov2_path, name, pretrained=True, source='local')
+        else:
+            dinov2_model = torch.hub.load('facebookresearch/dinov2', name, pretrained=True)
         dinov2_model.eval()
         self.models['image_cond_model'] = dinov2_model
         transform = transforms.Compose([
